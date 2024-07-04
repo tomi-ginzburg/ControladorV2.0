@@ -5,6 +5,8 @@
 #include <OneWire.h>                
 #include <DallasTemperature.h>
 
+#define CANTIDAD_MUESTRAS 10
+
 // =====[Declaracion de tipos de datos publicos]=====
 
 
@@ -16,6 +18,10 @@ void leerDatosSensores();
 
 void actualizarSensores();
 
-const float* leerSensores();
+void solicitarActivarSensor();
+
+void solicitarDesactivarSensor();
+
+const float (*leerSensores())[1+CANTIDAD_MUESTRAS];
 
 #endif

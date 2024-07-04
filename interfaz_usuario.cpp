@@ -9,18 +9,19 @@ LiquidCrystal_I2C lcd(0x27,16,2);
 const float *temperaturaCalentadorIU = NULL;
 const float *temperaturaBombaIU = NULL; 
 const configuracion_t *configuraciones = NULL;
+const estadoControl_t *estadoControlIU = NULL;
 const estadoConfiguraciones_t *estadoConfiguracionesIU = NULL;
 const estadoMenuBasico_t *estadoMenuBasicoIU = NULL;
 const estadoMenuAvanzado_t *estadoMenuAvanzadoIU = NULL;
 const estadoMostrarParametros_t *estadoMostrarParametrosIU = NULL;
-const estadoMostrarSensores_t *estadoMostrarSensoresIU = NULL;
 
 // Variables para el registro de los estado anteriores
+
+estadoControl_t estadoControlAnteriorIU;
 estadoConfiguraciones_t estadoConfiguracionesAnteriorIU;
 estadoMenuBasico_t estadoMenuBasicoAnteriorIU;
 estadoMenuAvanzado_t estadoMenuAvanzadoAnteriorIU;
 estadoMostrarParametros_t estadoMostrarParametrosAnteriorIU;
-estadoMostrarSensores_t estadoMostrarSensoresAnteriorIU;
 
 bool primeraEntradaEstado = false;
 
@@ -29,7 +30,6 @@ bool primeraEntradaEstado = false;
 void actualizarDisplayBasico();
 void actualizarDisplayAvanzado();
 void actualizarDisplayParametros();
-void actualizarDisplaySensores();
 void actualizarPrimeraEntradaEstado();
 void titilarCursor(int x,int y);
 
@@ -37,22 +37,21 @@ void titilarCursor(int x,int y);
 
 void inicializarInterfazUsuario(){
     
-    const float *valoresSensores = leerSensores();
-    temperaturaCalentadorIU = &valoresSensores[0]; 
-    temperaturaBombaIU = &valoresSensores[1]; 
+    const float (*valoresSensores)[CANTIDAD_MUESTRAS+1] = leerSensores();
+    temperaturaCalentadorIU = &valoresSensores[0][0]; 
+    temperaturaBombaIU = &valoresSensores[1][0]; 
 
     configuraciones = leerConfiguraciones();
+    estadoControlIU = leerEstadoControl();
     estadoConfiguracionesIU = leerEstadoConfiguraciones();
     estadoMenuBasicoIU = leerEstadoMenuBasico();
     estadoMenuAvanzadoIU = leerEstadoMenuAvanzado();
     estadoMostrarParametrosIU = leerEstadoMostrarParametros();
-    estadoMostrarSensoresIU = leerEstadoMostrarSensores();
 
     estadoConfiguracionesAnteriorIU = *estadoConfiguracionesIU;
     estadoMenuBasicoAnteriorIU = *estadoMenuBasicoIU;
     estadoMenuAvanzadoAnteriorIU = *estadoMenuAvanzadoIU;
     estadoMostrarParametrosAnteriorIU = *estadoMostrarParametrosIU;
-    estadoMostrarSensoresAnteriorIU = *estadoMostrarSensoresIU;
 
     lcd.init();           
     lcd.backlight();
@@ -67,36 +66,44 @@ void inicializarInterfazUsuario(){
 void actualizarInterfazUsuario(){
 
     actualizarPrimeraEntradaEstado();
-    switch (*estadoConfiguracionesIU){
-    case IDLE_CONFIGURACION:
+    if (*estadoControlIU == CAMBIO_SENSORES){
         if (primeraEntradaEstado == true){
             lcd.clear();
-            lcd.setCursor(2,0);
-            lcd.print("TEMPERATURA:");
-            lcd.setCursor(10,1);
-            lcd.write(byte(223));
-            lcd.print("C");
+            lcd.setCursor(3,0);
+            lcd.print("VERIFICAR");
+            lcd.setCursor(4,1);
+            lcd.print("SENSOR");
         }
+    } else { 
 
-        lcd.setCursor(5,1);
-        lcd.print(*temperaturaCalentadorIU,1);
-        break;
-    
-    case BASICO:
-        actualizarDisplayBasico();
-        break;
+        switch (*estadoConfiguracionesIU){
+        case IDLE_CONFIGURACION:
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(2,0);
+                lcd.print("TEMPERATURA:");
+                lcd.setCursor(10,1);
+                lcd.write(byte(223));
+                lcd.print("C");
+            }
 
-    case AVANZADO: 
-        actualizarDisplayAvanzado();
-        break;
+            lcd.setCursor(5,1);
+            lcd.print(*temperaturaCalentadorIU,1);
+            break;
         
-    case MOSTRAR_PARAMETROS:
-        actualizarDisplayParametros();
-        break;
-    
-    case MOSTRAR_SENSORES:
-        actualizarDisplaySensores();
-      break;
+        case BASICO:
+            actualizarDisplayBasico();
+            break;
+
+        case AVANZADO: 
+            actualizarDisplayAvanzado();
+            break;
+            
+        case MOSTRAR_PARAMETROS:
+            actualizarDisplayParametros();
+            break;
+        
+        }
     }
 }
 
@@ -111,7 +118,8 @@ void actualizarDisplayBasico(){
                 lcd.setCursor(6,0);
                 lcd.print("SP1:");
                 lcd.setCursor(6,1);
-                lcd.print(configuraciones->SP1.valor,1);
+                lcd.print(configuraciones->SP[0].valor,1);
+                lcd.print(" ");
             }
             break;
 
@@ -119,7 +127,8 @@ void actualizarDisplayBasico(){
             titilarCursor(3,1);
 
             lcd.setCursor(6,1);
-            lcd.print(configuraciones->SP1.valorConfiguracion,1);
+            lcd.print(configuraciones->SP[0].valorConfiguracion,1);
+                lcd.print(" ");
             break;
 
         case SP2_ESTABLE: 
@@ -128,7 +137,8 @@ void actualizarDisplayBasico(){
                 lcd.setCursor(6,0);
                 lcd.print("SP2:");
                 lcd.setCursor(6,1);
-                lcd.print(configuraciones->SP2.valor,1);
+                lcd.print(configuraciones->SP[1].valor,1);
+                lcd.print(" ");
             }
             break;
 
@@ -136,7 +146,48 @@ void actualizarDisplayBasico(){
             titilarCursor(3,1);
             
             lcd.setCursor(6,1);
-            lcd.print(configuraciones->SP2.valorConfiguracion,1);
+            lcd.print(configuraciones->SP[1].valorConfiguracion,1);
+            lcd.print(" ");
+            
+            break;
+            
+        case SP3_ESTABLE: 
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(6,0);
+                lcd.print("SP3:");
+                lcd.setCursor(6,1);
+                lcd.print(configuraciones->SP[2].valor,1);
+                lcd.print(" ");
+            }
+            break;
+
+        case SP3_EN_CAMBIO: 
+            titilarCursor(3,1);
+            
+            lcd.setCursor(6,1);
+            lcd.print(configuraciones->SP[2].valorConfiguracion,1);
+            lcd.print(" ");
+            
+            break;
+            
+        case SP4_ESTABLE: 
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(6,0);
+                lcd.print("SP4:");
+                lcd.setCursor(6,1);
+                lcd.print(configuraciones->SP[3].valor,1);
+                lcd.print(" ");
+            }
+            break;
+
+        case SP4_EN_CAMBIO: 
+            titilarCursor(3,1);
+            
+            lcd.setCursor(6,1);
+            lcd.print(configuraciones->SP[3].valorConfiguracion,1);
+            lcd.print(" ");
             
             break;
     }
@@ -182,128 +233,114 @@ void actualizarDisplayAvanzado(){
 
             break;
 
-        case SP1_ESPERANDO: 
+        case SP1_HISTERESIS_ESTABLE: 
             if (primeraEntradaEstado == true){
                 lcd.clear();
                 lcd.setCursor(0,0);
-                lcd.print("MAX SP1:");
-                lcd.setCursor(10,0);
-                lcd.print(configuraciones->SP1.maximoConfiguracion,1);
-                lcd.setCursor(0,1);
-                lcd.print("MIN SP1:");
-                lcd.setCursor(10,1);
-                lcd.print(configuraciones->SP1.minimoConfiguracion,1);
+                lcd.print("HISTERESIS SP1:");
+                lcd.setCursor(6,1);
+                lcd.print(configuraciones->SP[0].histeresis.valor,1);
             }
             break;
 
-        case SP1_MAX_EN_CAMBIO: 
+        case SP1_HISTERESIS_EN_CAMBIO: 
+            titilarCursor(3,1);
+
+            lcd.setCursor(6,1);
+            lcd.print(configuraciones->SP[0].histeresis.valorConfiguracion,1);
+            break;
+
+        case SP2_HISTERESIS_ESTABLE: 
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print("HISTERESIS SP2:");
+                lcd.setCursor(6,1);
+                lcd.print(configuraciones->SP[1].histeresis.valor,1);
+            }
+            break;
+
+        case SP2_HISTERESIS_EN_CAMBIO: 
+            titilarCursor(3,1);
+
+            lcd.setCursor(6,1);
+            lcd.print(configuraciones->SP[1].histeresis.valorConfiguracion,1);
+            break;
+
+        case SP3_HISTERESIS_ESTABLE: 
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print("HISTERESIS SP3:");
+                lcd.setCursor(6,1);
+                lcd.print(configuraciones->SP[2].histeresis.valor,1);
+            }
+            break;
+
+        case SP3_HISTERESIS_EN_CAMBIO: 
+            titilarCursor(3,1);
+
+            lcd.setCursor(6,1);
+            lcd.print(configuraciones->SP[2].histeresis.valorConfiguracion,1);
+            break;
+
+        case SP4_HISTERESIS_ESTABLE: 
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print("HISTERESIS SP4:");
+                lcd.setCursor(6,1);
+                lcd.print(configuraciones->SP[3].histeresis.valor,1);
+            }
+            break;
+
+        case SP4_HISTERESIS_EN_CAMBIO: 
+            titilarCursor(3,1);
+
+            lcd.setCursor(6,1);
+            lcd.print(configuraciones->SP[3].histeresis.valorConfiguracion,1);
+            break;
+
+        case LIMITES_ESPERANDO: 
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print("MAX SP:");
+                lcd.setCursor(10,0);
+                lcd.print(configuraciones->limitesSP.maximoConfiguracion,1);
+                lcd.setCursor(0,1);
+                lcd.print("MIN SP:");
+                lcd.setCursor(10,1);
+                lcd.print(configuraciones->limitesSP.minimoConfiguracion,1);
+            }
+            break;
+
+        case LIMITE_MAXIMO_EN_CAMBIO: 
         
             if (primeraEntradaEstado == true){
                 lcd.clear();
                 lcd.setCursor(2,0);
-                lcd.print("MAXIMO SP1:");
+                lcd.print("MAXIMO SP:");
             }
 
             titilarCursor(3,1);
 
             lcd.setCursor(6,1);
-            lcd.print(configuraciones->SP1.maximoConfiguracion,1);
+            lcd.print(configuraciones->limitesSP.maximoConfiguracion,1);
             break;
 
-        case SP1_MIN_EN_CAMBIO:
+        case LIMITE_MINIMO_EN_CAMBIO:
 
             if (primeraEntradaEstado == true){
                 lcd.clear();
                 lcd.setCursor(1,0);
-                lcd.print("MINIMO SP1:");
+                lcd.print("MINIMO SP:");
             }
 
             titilarCursor(3,1);
 
             lcd.setCursor(6,1);
-            lcd.print(configuraciones->SP1.minimoConfiguracion,1);
-            break;
-
-        case SP2_ESPERANDO: 
-            if (primeraEntradaEstado == true){
-                lcd.clear();
-                lcd.setCursor(0,0);
-                lcd.print("MAX SP2:");
-                lcd.setCursor(10,0);
-                lcd.print(configuraciones->SP2.maximoConfiguracion,1);
-                lcd.setCursor(0,1);
-                lcd.print("MIN SP2:");
-                lcd.setCursor(10,1);
-                lcd.print(configuraciones->SP2.minimoConfiguracion,1);
-            }
-            break;
-
-        case SP2_MAX_EN_CAMBIO: 
-
-            if (primeraEntradaEstado == true){
-                lcd.clear();
-                lcd.setCursor(2,0);
-                lcd.print("MAXIMO SP2:");
-            }
-
-            titilarCursor(3,1);
-
-            lcd.setCursor(6,1);
-            lcd.print(configuraciones->SP2.maximoConfiguracion,1);
-            break;
-
-        case SP2_MIN_EN_CAMBIO: 
-            if (primeraEntradaEstado == true){
-                lcd.clear();
-                lcd.setCursor(1,0);
-                lcd.print("MINIMO SP2:");
-            }
-
-            titilarCursor(3,1);
-
-            lcd.setCursor(6,1);
-            lcd.print(configuraciones->SP2.minimoConfiguracion,1);
-            break;
-
-        case HISTERESIS_ESPERANDO: 
-            if (primeraEntradaEstado == true){
-                lcd.clear();
-                lcd.setCursor(0,0);
-                lcd.print("HIST 1:");
-                lcd.setCursor(10,0);
-                lcd.print(configuraciones->histeresis1.valor,1);
-                lcd.setCursor(0,1);
-                lcd.print("HIST 2:");
-                lcd.setCursor(10,1);
-                lcd.print(configuraciones->histeresis2.valor,1);
-            }
-            break;
-
-        case H1_EN_CAMBIO: 
-
-            if (primeraEntradaEstado == true){
-                lcd.clear();
-                lcd.setCursor(2,0);
-                lcd.print("HISTERESIS 1:");
-            }
-
-            titilarCursor(3,1);
-
-            lcd.setCursor(6,1);
-            lcd.print(configuraciones->histeresis1.valorConfiguracion,1);
-            break;
-
-        case H2_EN_CAMBIO: 
-            if (primeraEntradaEstado == true){
-                lcd.clear();
-                lcd.setCursor(1,0);
-                lcd.print("HISTERESIS 2:");
-            }
-
-            titilarCursor(3,1);
-
-            lcd.setCursor(6,1);
-            lcd.print(configuraciones->histeresis2.valorConfiguracion,1);
+            lcd.print(configuraciones->limitesSP.minimoConfiguracion,1);
             break;
 
         case RETARDOS_ESPERANDO: 
@@ -402,7 +439,8 @@ void actualizarDisplayParametros(){
             lcd.setCursor(6,0);
             lcd.print("SP1:");
             lcd.setCursor(6,1);
-            lcd.print(configuraciones->SP1.valor,1);
+            lcd.print(configuraciones->SP[0].valor,1);
+            lcd.print(" ");
             }
         break;
         case MOSTRAR_SP2: 
@@ -411,25 +449,29 @@ void actualizarDisplayParametros(){
             lcd.setCursor(6,0);
             lcd.print("SP2:");
             lcd.setCursor(6,1);
-            lcd.print(configuraciones->SP2.valor,1);
+            lcd.print(configuraciones->SP[1].valor,1);
+            lcd.print(" ");
             }
         break;
-    }
-}
-
-void actualizarDisplaySensores(){
-    switch (*estadoMostrarSensoresIU) {
-        case MOSTRAR_SENSOR2:
+        case MOSTRAR_SP3: 
             if (primeraEntradaEstado == true){
             lcd.clear();
-            lcd.setCursor(2,0);
-            lcd.print("CALEFACCION:");
-            lcd.setCursor(10,1);
-            lcd.write(byte(223));
-            lcd.print("C");
+            lcd.setCursor(6,0);
+            lcd.print("SP3:");
+            lcd.setCursor(6,1);
+            lcd.print(configuraciones->SP[2].valor,1);
+            lcd.print(" ");
             }
-            lcd.setCursor(5,1);
-            lcd.print(*temperaturaBombaIU,1);
+        break;
+        case MOSTRAR_SP4: 
+            if (primeraEntradaEstado == true){
+            lcd.clear();
+            lcd.setCursor(6,0);
+            lcd.print("SP4:");
+            lcd.setCursor(6,1);
+            lcd.print(configuraciones->SP[3].valor,1);
+            lcd.print(" ");
+            }
         break;
     }
 }
@@ -440,6 +482,10 @@ void actualizarPrimeraEntradaEstado(){
         primeraEntradaEstado = false;
     } else {
         // Si no estaba en true, compara los estados actuales con los anteriores para ver si cambiaron
+        if (estadoControlAnteriorIU != *estadoControlIU){
+            primeraEntradaEstado = true;
+            estadoControlAnteriorIU = *estadoControlIU;
+        }
         if (estadoConfiguracionesAnteriorIU != *estadoConfiguracionesIU){
             primeraEntradaEstado = true;
             estadoConfiguracionesAnteriorIU = *estadoConfiguracionesIU;
@@ -457,11 +503,6 @@ void actualizarPrimeraEntradaEstado(){
             if (estadoMostrarParametrosAnteriorIU != *estadoMostrarParametrosIU){
                 primeraEntradaEstado = true;
                 estadoMostrarParametrosAnteriorIU = *estadoMostrarParametrosIU;
-            }
-
-            if (estadoMostrarSensoresAnteriorIU != *estadoMostrarSensoresIU){
-                primeraEntradaEstado = true;
-                estadoMostrarSensoresAnteriorIU = *estadoMostrarSensoresIU;
             }
 
         }

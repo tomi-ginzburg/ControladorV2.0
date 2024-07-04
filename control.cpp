@@ -5,20 +5,12 @@
 // =====[Declaracion de tipos de datos privados]=====
 
 typedef enum {
-    APAGADO_CALENTADOR,
-    PRENDIDO_MEDIO,
-    PRENDIDO_COMPLETO
-} estadoControlCalentador_t;
-
-typedef enum {
-    APAGADO_BOMBA,
-    PRENDIDO_BOMBA
-} estadoControlBomba_t;
-
+    ETAPA_ENCENDIDA,
+    ETAPA_APAGADA
+} estadoEtapa_t;
 
 estadoControl_t estadoControl = FUNCIONANDO;
-estadoControlCalentador_t estadoControlCalentador = APAGADO_CALENTADOR;
-estadoControlBomba_t estadoControlBomba = APAGADO_BOMBA;
+estadoEtapa_t estadosEtapas[CANT_ETAPAS];
 float contadorEspera = -1;
 bool finTemporizador = false;
 int cantidadLecturasErroneas[2] = {0,0};
@@ -32,51 +24,55 @@ const configuracion_t *configuracionesControl = NULL;
 // =====[Declaracion de funciones privadas]==========
 
 void actualizarEstadoControl();
-void actualizarControlCalentador();
-void actualizarControlBomba();
+void actualizarEtapa(int etapa);
 void verificarSensores();
 void actualizarContador();
 
 // =====[Implementacion de funciones publicas]=======
 
 void inicializarControles(){
-    const float *valoresSensores = leerSensores();
-    temperaturaCalentador = &valoresSensores[0]; 
-    temperaturaBomba = &valoresSensores[1]; 
-    temperaturaSeguridad = &valoresSensores[2]; 
+    const float (*valoresSensores)[CANTIDAD_MUESTRAS+1] = leerSensores();
+    temperaturaCalentador = &valoresSensores[0][0]; 
+    temperaturaBomba = &valoresSensores[1][0]; 
+    temperaturaSeguridad = &valoresSensores[2][0]; 
 
     configuracionesControl = leerConfiguraciones();
+
+    // inicializacion de las etapas apagadas
+    for (int i=0;i<CANT_ETAPAS;i++){
+        estadosEtapas[i] = ETAPA_APAGADA;
+    }
 
 }
 
 void actualizarControles(){
 
     actualizarContador();
-    verificarSensores();
-
     actualizarEstadoControl();
 
     switch (estadoControl){
         case CAMBIO_SENSORES:
         case DIAGNOSTICO:
         case CONTROL_APAGADO: 
-            solicitarDesactivarRele(RELE_CALENTADOR_1);
-            solicitarDesactivarRele(RELE_CALENTADOR_2_1);
-            solicitarDesactivarRele(RELE_CALENTADOR_2_2);
-            solicitarDesactivarRele(RELE_BOMBA);
-            estadoControlCalentador = APAGADO_CALENTADOR;
-            estadoControlBomba = APAGADO_BOMBA;
+            for (int i=0;i<CANT_ETAPAS;i++){
+                solicitarDesactivarRele(reles[i]);
+                estadosEtapas[i] = ETAPA_APAGADA;
+            }
             break;
         case FUNCIONANDO:
-            if (configuracionesControl->SP1.valor > 0){
-                actualizarControlCalentador();
-            }
-            if (configuracionesControl->SP2.valor > 0){
-                actualizarControlBomba();
+            verificarSensores();
+            for (int i=0;i<CANT_ETAPAS;i++){
+                if (configuracionesControl->SP[i].valor > 0){
+                    actualizarEtapa(i);
+                }
             }
             break;
         default: estadoControl = CONTROL_APAGADO;
     }
+}
+
+const estadoControl_t* leerEstadoControl(){
+    return &estadoControl;
 }
 
 // =====[Implementacion de funciones privadas]=======
@@ -96,6 +92,7 @@ void actualizarEstadoControl(){
         case CAMBIO_SENSORES: 
             if (configuracionesControl->cambioSensores == false){
                 estadoControl = FUNCIONANDO;
+                solicitarActivarSensor();
             }
             if (configuracionesControl->modoDiagnostico == true){
                 estadoControl = DIAGNOSTICO;
@@ -113,82 +110,80 @@ void actualizarEstadoControl(){
     }
 }
 
-// Si se pierde el estado de la FSM se apaga
-void actualizarControlCalentador(){
-    switch (estadoControlCalentador){
-        case APAGADO_CALENTADOR: 
-        
-            // si estaba apagado pero bajo de SP1 - HISTERESIS1: 
-            // se activa el RELE_CALENTADOR_1, se inicia el timerCalentador y se cambia a PRENDIDO_MEDIO
-            if (*temperaturaCalentador < configuracionesControl->SP1.valor - configuracionesControl->histeresis1.valor){
-                solicitarActivarRele(RELE_CALENTADOR_1);
-                finTemporizador = false;
-                contadorEspera =  configuracionesControl->retardoPrendido.valor;
-                estadoControlCalentador = PRENDIDO_MEDIO;
-            }
-        
-            break;     
-        case PRENDIDO_MEDIO: 
-            if ((*temperaturaCalentador > configuracionesControl->SP1.valor) && (finTemporizador == true)){
-                solicitarDesactivarRele(RELE_CALENTADOR_1);
-                finTemporizador = false;
-                estadoControlCalentador = APAGADO_CALENTADOR;
-            }
-            if ((*temperaturaCalentador < configuracionesControl->SP1.valor - configuracionesControl->histeresis2.valor) && (finTemporizador == true)){
-                solicitarActivarRele(RELE_CALENTADOR_2_1);
-                solicitarActivarRele(RELE_CALENTADOR_2_2);
-                finTemporizador = false;
-                estadoControlCalentador = PRENDIDO_COMPLETO;
-            }
-        
-            break;
-        case PRENDIDO_COMPLETO: 
-            
-            if (*temperaturaCalentador > configuracionesControl->SP1.valor){
-                solicitarDesactivarRele(RELE_CALENTADOR_2_1);
-                solicitarDesactivarRele(RELE_CALENTADOR_2_2);
-                finTemporizador = false;
-                contadorEspera = configuracionesControl->retardoApagado.valor;
-                estadoControlCalentador = PRENDIDO_MEDIO;
-            }
-
-            break;
-        default: estadoControlCalentador = APAGADO_CALENTADOR; break;
-    }
-}
-
-void actualizarControlBomba(){
-    switch (estadoControlBomba){
-        case APAGADO_BOMBA:
-                if (*temperaturaBomba < configuracionesControl->SP2.valor - configuracionesControl->histeresis1.valor){
-                    solicitarActivarRele(RELE_BOMBA);
-                    estadoControlBomba = PRENDIDO_BOMBA;
+void actualizarEtapa(int etapa){
+    switch (estadosEtapas[etapa]){
+        case ETAPA_APAGADA:
+                if (*temperaturaCalentador < configuracionesControl->SP[etapa].valor - configuracionesControl->SP[etapa].histeresis.valor){
+                    switch (etapa){
+                        case 1:
+                            if (finTemporizador == true){
+                                finTemporizador = false;
+                                solicitarActivarRele(reles[etapa]);
+                                estadosEtapas[etapa] = ETAPA_ENCENDIDA;
+                            }
+                            break;
+                        case 0:
+                            // inicio el contador
+                            if (configuracionesControl->retardoPrendido.valor == 0){
+                                finTemporizador = true;
+                            } else {
+                                contadorEspera = configuracionesControl->retardoPrendido.valor - 1;
+                            }
+                            
+                        case 2:
+                        case 3:
+                            solicitarActivarRele(reles[etapa]);
+                            estadosEtapas[etapa] = ETAPA_ENCENDIDA;
+                            break;
+                    }
                 }
             break;
-        case PRENDIDO_BOMBA:
-                if (*temperaturaBomba > configuracionesControl->SP2.valor){
-                    solicitarDesactivarRele(RELE_BOMBA);
-                    estadoControlBomba = APAGADO_BOMBA;
+        case ETAPA_ENCENDIDA:
+                if (*temperaturaCalentador > configuracionesControl->SP[etapa].valor){
+                    switch (etapa){
+                        case 1:
+                            if (finTemporizador == true){
+                                finTemporizador = false;
+                                solicitarDesactivarRele(reles[etapa]);
+                                estadosEtapas[etapa] = ETAPA_APAGADA;
+                            }
+                            break;
+                        case 0:
+                            // inicio el contador
+                            if (configuracionesControl->retardoApagado.valor == 0){
+                                finTemporizador = true;
+                            } else {
+                                contadorEspera = configuracionesControl->retardoApagado.valor - 1;
+                            }
+                        case 2:
+                        case 3:
+                            solicitarDesactivarRele(reles[etapa]);
+                            estadosEtapas[etapa] = ETAPA_APAGADA;
+                            break;
+
+                    }
                 }
             break;
-        default: estadoControlBomba = APAGADO_BOMBA; break;
+        default:  estadoControl = CONTROL_APAGADO;
     }
 }
 
 void verificarSensores(){
-    if (*temperaturaBomba == -127 ){
-        cantidadLecturasErroneas[1]++;
-        if (cantidadLecturasErroneas[1] >= 10){
-            estadoControl = CONTROL_APAGADO;
-        }
-    } else { 
-        cantidadLecturasErroneas[1] = 0;
-    }
+    // if (*temperaturaBomba == -127 ){
+    //     cantidadLecturasErroneas[1]++;
+    //     if (cantidadLecturasErroneas[1] >= 10){
+    //         estadoControl = CONTROL_APAGADO;
+    //     }
+    // } else { 
+    //     cantidadLecturasErroneas[1] = 0;
+    // }
     
     if (*temperaturaSeguridad > 500){
         cantidadLecturasErroneas[0]++;
-        if (cantidadLecturasErroneas[0] >= 10){
-            estadoControl = CONTROL_APAGADO;
+        if (cantidadLecturasErroneas[0] >= 5){
+            estadoControl = CAMBIO_SENSORES;
+            solicitarDesactivarSensor();
+            cantidadLecturasErroneas[0] = 0;
         }
     } else { 
         cantidadLecturasErroneas[0] = 0;

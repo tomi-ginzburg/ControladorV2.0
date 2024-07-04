@@ -6,7 +6,6 @@
 #include "reles.h"
 #include "configuraciones.h"
 
-
 // =====[Declaracion de tipos de datos publicos]=====
 
 typedef enum {
@@ -22,5 +21,7 @@ typedef enum {
 void inicializarControles();
 
 void actualizarControles();
+
+const estadoControl_t* leerEstadoControl();
 
 #endif
