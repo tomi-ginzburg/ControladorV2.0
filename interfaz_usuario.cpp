@@ -7,7 +7,6 @@ LiquidCrystal_I2C lcd(0x27,16,2);
 
 // Punteros a datos de otros modulos
 const float *temperaturaCalentadorIU = NULL;
-const float *temperaturaBombaIU = NULL; 
 const configuracion_t *configuraciones = NULL;
 const estadoControl_t *estadoControlIU = NULL;
 const estadoConfiguraciones_t *estadoConfiguracionesIU = NULL;
@@ -39,7 +38,6 @@ void inicializarInterfazUsuario(){
     
     const float (*valoresSensores)[CANTIDAD_MUESTRAS+1] = leerSensores();
     temperaturaCalentadorIU = &valoresSensores[0][0]; 
-    temperaturaBombaIU = &valoresSensores[1][0]; 
 
     configuraciones = leerConfiguraciones();
     estadoControlIU = leerEstadoControl();
@@ -66,6 +64,8 @@ void inicializarInterfazUsuario(){
 void actualizarInterfazUsuario(){
 
     actualizarPrimeraEntradaEstado();
+    
+    // Si esta en estado CAMBIO SENSORES, se muestra por pantalla VERIFICAR SENSOR
     if (*estadoControlIU == CAMBIO_SENSORES){
         if (primeraEntradaEstado == true){
             lcd.clear();
@@ -74,8 +74,9 @@ void actualizarInterfazUsuario(){
             lcd.setCursor(4,1);
             lcd.print("SENSOR");
         }
-    } else { 
+    } else {
 
+        // Si no esta en cambio de sensores, se muestran las configuraciones regulares 
         switch (*estadoConfiguracionesIU){
         case IDLE_CONFIGURACION:
             if (primeraEntradaEstado == true){
@@ -128,7 +129,7 @@ void actualizarDisplayBasico(){
 
             lcd.setCursor(6,1);
             lcd.print(configuraciones->SP[0].valorConfiguracion,1);
-                lcd.print(" ");
+            lcd.print(" ");
             break;
 
         case SP2_ESTABLE: 
@@ -248,6 +249,7 @@ void actualizarDisplayAvanzado(){
 
             lcd.setCursor(6,1);
             lcd.print(configuraciones->SP[0].histeresis.valorConfiguracion,1);
+            lcd.print(" ");
             break;
 
         case SP2_HISTERESIS_ESTABLE: 
@@ -265,6 +267,7 @@ void actualizarDisplayAvanzado(){
 
             lcd.setCursor(6,1);
             lcd.print(configuraciones->SP[1].histeresis.valorConfiguracion,1);
+            lcd.print(" ");
             break;
 
         case SP3_HISTERESIS_ESTABLE: 
@@ -282,6 +285,7 @@ void actualizarDisplayAvanzado(){
 
             lcd.setCursor(6,1);
             lcd.print(configuraciones->SP[2].histeresis.valorConfiguracion,1);
+            lcd.print(" ");
             break;
 
         case SP4_HISTERESIS_ESTABLE: 
@@ -299,6 +303,7 @@ void actualizarDisplayAvanzado(){
 
             lcd.setCursor(6,1);
             lcd.print(configuraciones->SP[3].histeresis.valorConfiguracion,1);
+            lcd.print(" ");
             break;
 
         case LIMITES_ESPERANDO: 
@@ -319,7 +324,7 @@ void actualizarDisplayAvanzado(){
         
             if (primeraEntradaEstado == true){
                 lcd.clear();
-                lcd.setCursor(2,0);
+                lcd.setCursor(3,0);
                 lcd.print("MAXIMO SP:");
             }
 
@@ -327,13 +332,14 @@ void actualizarDisplayAvanzado(){
 
             lcd.setCursor(6,1);
             lcd.print(configuraciones->limitesSP.maximoConfiguracion,1);
+            lcd.print(" ");
             break;
 
         case LIMITE_MINIMO_EN_CAMBIO:
 
             if (primeraEntradaEstado == true){
                 lcd.clear();
-                lcd.setCursor(1,0);
+                lcd.setCursor(3,0);
                 lcd.print("MINIMO SP:");
             }
 
@@ -341,6 +347,7 @@ void actualizarDisplayAvanzado(){
 
             lcd.setCursor(6,1);
             lcd.print(configuraciones->limitesSP.minimoConfiguracion,1);
+            lcd.print(" ");
             break;
 
         case RETARDOS_ESPERANDO: 
@@ -368,6 +375,7 @@ void actualizarDisplayAvanzado(){
 
             lcd.setCursor(6,1);
             lcd.print(configuraciones->retardoPrendido.valorConfiguracion,1);
+            lcd.print(" ");
             break;
 
         case RETARDO_APAGADO_EN_CAMBIO: 
@@ -381,18 +389,48 @@ void actualizarDisplayAvanzado(){
 
             lcd.setCursor(6,1);
             lcd.print(configuraciones->retardoApagado.valorConfiguracion,1);
+            lcd.print(" ");
             break;
         
-        case CONFIG_SENSORES: 
+        case MINIMO_ALARMA_ESPERANDO:
             if (primeraEntradaEstado == true){
                 lcd.clear();
-                lcd.setCursor(0,0);
-                lcd.print("CAMBIO SENSORES:");
+                lcd.setCursor(1,0);
+                lcd.print("MINIMO ALARMA:");
+                lcd.setCursor(1,1);
+                lcd.print(configuraciones->alarma.minimo,1);
+                lcd.setCursor(12,1);
+                if (configuraciones->alarma.minimoActivo == true){
+                    lcd.print("ON ");
+                } else {
+                    lcd.print("OFF");
+                }
+            }
+            break;
+        case MINIMO_ALARMA_EN_CAMBIO:
+
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(1,0);
+                lcd.print("MINIMO ALARMA:");
+            }
+
+            titilarCursor(3,1);
+
+            lcd.setCursor(6,1);
+            lcd.print(configuraciones->alarma.minimoConfiguracion,1);
+            lcd.print(" ");
+            break;
+        case MINIMO_ALARMA_ACTIVO_EN_CAMBIO:
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(4,0);
+                lcd.print("ACTIVAR:");
             }
 
             titilarCursor(4,1);
             lcd.setCursor(7,1);
-            if (configuraciones->cambioSensores == true){
+            if (configuraciones->alarma.minimoActivo == true){
                 lcd.print("ON ");
             } else {
                 lcd.print("OFF");
@@ -400,23 +438,52 @@ void actualizarDisplayAvanzado(){
 
             break;
         
-        case MODO_DIAGNOSTICO: 
+        case MAXIMO_ALARMA_ESPERANDO:
             if (primeraEntradaEstado == true){
                 lcd.clear();
-                lcd.setCursor(2,0);
-                lcd.print("DIAGNOSTICO:");
+                lcd.setCursor(1,0);
+                lcd.print("MAXIMO ALARMA:");
+                lcd.setCursor(1,1);
+                lcd.print(configuraciones->alarma.maximo,1);
+                lcd.setCursor(12,1);
+                if (configuraciones->alarma.maximoActivo == true){
+                    lcd.print("ON ");
+                } else {
+                    lcd.print("OFF");
+                }
+            }
+            break;
+        case MAXIMO_ALARMA_EN_CAMBIO:
+
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(1,0);
+                lcd.print("MAXIMO ALARMA:");
+            }
+
+            titilarCursor(3,1);
+
+            lcd.setCursor(6,1);
+            lcd.print(configuraciones->alarma.maximoConfiguracion,1);
+            lcd.print(" ");
+            break;
+        case MAXIMO_ALARMA_ACTIVO_EN_CAMBIO:
+            if (primeraEntradaEstado == true){
+                lcd.clear();
+                lcd.setCursor(4,0);
+                lcd.print("ACTIVAR:");
             }
 
             titilarCursor(4,1);
             lcd.setCursor(7,1);
-            if (configuraciones->modoDiagnostico == true){
+            if (configuraciones->alarma.maximoActivo == true){
                 lcd.print("ON ");
             } else {
                 lcd.print("OFF");
             }
 
             break;
-
+        
         case VERSION_SOFTWARE:
             if (primeraEntradaEstado == true){
                 lcd.clear();
@@ -511,11 +578,11 @@ void actualizarPrimeraEntradaEstado(){
 
 void titilarCursor(int x,int y){
     static int contador = 0;
-    if (contador > 50){
+    if (contador == 10){
         lcd.setCursor(x,y);
         lcd.print("->");
     }
-    if (contador > 100 ){
+    if (contador == 20 ){
         lcd.setCursor(x,y);
         lcd.print("  ");
         contador = 0;

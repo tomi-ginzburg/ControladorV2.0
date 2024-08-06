@@ -36,6 +36,15 @@ typedef struct{
 } setpoint_t;
 
 typedef struct{
+    float minimo;
+    float maximo;
+    float minimoConfiguracion;
+    float maximoConfiguracion;
+    bool maximoActivo;
+    bool minimoActivo;
+} alarma_t;
+
+typedef struct{
     int valor[CANT_DIGITOS_INGRESO];
     int ingresado[CANT_DIGITOS_INGRESO];
     int cantidadDigitosIngresados;
@@ -47,6 +56,7 @@ typedef struct{
     limitesSP_t limitesSP;
     retardo_t retardoPrendido;
     retardo_t retardoApagado;
+    alarma_t alarma;
     bool cambioSensores;
     bool modoDiagnostico;
     codigo_t codigo;
@@ -89,8 +99,12 @@ typedef enum{
     RETARDOS_ESPERANDO,
     RETARDO_PRENDIDO_EN_CAMBIO,
     RETARDO_APAGADO_EN_CAMBIO,
-    CONFIG_SENSORES,
-    MODO_DIAGNOSTICO,
+    MINIMO_ALARMA_ESPERANDO,
+    MINIMO_ALARMA_EN_CAMBIO,
+    MINIMO_ALARMA_ACTIVO_EN_CAMBIO,
+    MAXIMO_ALARMA_ESPERANDO,
+    MAXIMO_ALARMA_EN_CAMBIO,
+    MAXIMO_ALARMA_ACTIVO_EN_CAMBIO,
     VERSION_SOFTWARE
 } estadoMenuAvanzado_t;
 

@@ -5,7 +5,7 @@
 #include <OneWire.h>                
 #include <DallasTemperature.h>
 
-#define CANTIDAD_MUESTRAS 10
+#define CANTIDAD_MUESTRAS 100
 
 // =====[Declaracion de tipos de datos publicos]=====
 

@@ -2,6 +2,8 @@
 
 // =====[Declaracion de defines privados]============
 
+#define TEMP_SEGURIDAD  500
+
 // =====[Declaracion de tipos de datos privados]=====
 
 typedef enum {
@@ -9,36 +11,36 @@ typedef enum {
     ETAPA_APAGADA
 } estadoEtapa_t;
 
-estadoControl_t estadoControl = FUNCIONANDO;
+estadoControl_t estadoControl;
 estadoEtapa_t estadosEtapas[CANT_ETAPAS];
 float contadorEspera = -1;
 bool finTemporizador = false;
-int cantidadLecturasErroneas[2] = {0,0};
 
 // punteros a variables de otros modulos
 const float *temperaturaCalentador = NULL;
-const float *temperaturaBomba = NULL;
 const float *temperaturaSeguridad = NULL;
 const configuracion_t *configuracionesControl = NULL;
 
 // =====[Declaracion de funciones privadas]==========
 
 void actualizarEstadoControl();
+void actualizarEtapas();
 void actualizarEtapa(int etapa);
-void verificarSensores();
+bool verificarSensor();
 void actualizarContador();
 
 // =====[Implementacion de funciones publicas]=======
 
 void inicializarControles(){
+
+    // Punteros a variables de otros modulos
     const float (*valoresSensores)[CANTIDAD_MUESTRAS+1] = leerSensores();
     temperaturaCalentador = &valoresSensores[0][0]; 
-    temperaturaBomba = &valoresSensores[1][0]; 
-    temperaturaSeguridad = &valoresSensores[2][0]; 
-
+    temperaturaSeguridad = &valoresSensores[1][0]; 
     configuracionesControl = leerConfiguraciones();
 
-    // inicializacion de las etapas apagadas
+    // Inicializacion del control funcionando y de las etapas apagadas
+    estadoControl = FUNCIONANDO;
     for (int i=0;i<CANT_ETAPAS;i++){
         estadosEtapas[i] = ETAPA_APAGADA;
     }
@@ -49,26 +51,8 @@ void actualizarControles(){
 
     actualizarContador();
     actualizarEstadoControl();
+    actualizarEtapas();
 
-    switch (estadoControl){
-        case CAMBIO_SENSORES:
-        case DIAGNOSTICO:
-        case CONTROL_APAGADO: 
-            for (int i=0;i<CANT_ETAPAS;i++){
-                solicitarDesactivarRele(reles[i]);
-                estadosEtapas[i] = ETAPA_APAGADA;
-            }
-            break;
-        case FUNCIONANDO:
-            verificarSensores();
-            for (int i=0;i<CANT_ETAPAS;i++){
-                if (configuracionesControl->SP[i].valor > 0){
-                    actualizarEtapa(i);
-                }
-            }
-            break;
-        default: estadoControl = CONTROL_APAGADO;
-    }
 }
 
 const estadoControl_t* leerEstadoControl(){
@@ -81,32 +65,86 @@ void actualizarEstadoControl(){
 
     switch (estadoControl){
         case CONTROL_APAGADO: break;
+
         case FUNCIONANDO: 
-            if (configuracionesControl->cambioSensores == true){
+            // Verifica si el sensor esta leyendo valores correctos
+            if (verificarSensor() == false){
                 estadoControl = CAMBIO_SENSORES;
+                solicitarDesactivarSensor();
             }
-            if (configuracionesControl->modoDiagnostico == true){
-                estadoControl = DIAGNOSTICO;
+
+            // Se verifica la alarma
+            if ((configuracionesControl->alarma.maximoActivo == true && *temperaturaCalentador > configuracionesControl->alarma.maximo)
+                || (configuracionesControl->alarma.minimoActivo == true && *temperaturaCalentador < configuracionesControl->alarma.minimo)){
+                estadoControl = ALARMA;
+                solicitarActivarAlarma();
             }
             break;
+
         case CAMBIO_SENSORES: 
+            // Si se cambia desde las configuraciones se vuelve al modo FUNCIONANDO
             if (configuracionesControl->cambioSensores == false){
                 estadoControl = FUNCIONANDO;
                 solicitarActivarSensor();
             }
-            if (configuracionesControl->modoDiagnostico == true){
-                estadoControl = DIAGNOSTICO;
-            }
             break;
-        case DIAGNOSTICO: 
-            if (configuracionesControl->modoDiagnostico == false){
+
+        case ALARMA:
+            // Se vuelve al modo FUNCIONANDO en caso de que la temperatura vuelva a los limites o se apague la alarma en las configuraciones
+            if ((configuracionesControl->alarma.maximoActivo == true && *temperaturaCalentador < configuracionesControl->alarma.maximo)
+                || (configuracionesControl->alarma.minimoActivo == true && *temperaturaCalentador > configuracionesControl->alarma.minimo)
+                || (configuracionesControl->alarma.minimoActivo == false && *temperaturaCalentador <= configuracionesControl->alarma.minimo)
+                || (configuracionesControl->alarma.maximoActivo == false && *temperaturaCalentador >= configuracionesControl->alarma.maximo)){
                 estadoControl = FUNCIONANDO;
+                solicitarDesactivarAlarma();
             }
-            if (configuracionesControl->cambioSensores == true){
+            
+            if (verificarSensor() == false){
                 estadoControl = CAMBIO_SENSORES;
+                solicitarDesactivarSensor();
             }
             break;
-        default: CONTROL_APAGADO;
+
+        default: estadoControl = CONTROL_APAGADO;
+    }
+}
+
+void actualizarEtapas(){
+    switch (estadoControl){
+    case CAMBIO_SENSORES:
+    case CONTROL_APAGADO: 
+        for (int i=0;i<CANT_ETAPAS;i++){
+            solicitarDesactivarRele(reles[i]);
+            estadosEtapas[i] = ETAPA_APAGADA;
+        }
+        break;
+
+    case FUNCIONANDO:
+        for (int i=0;i<CANT_ETAPAS;i++){
+            // Actualizo unicamente las que tienen valor > 0
+            if (configuracionesControl->SP[i].valor > 0){
+                actualizarEtapa(i);
+            } else if (estadosEtapas[i] == ETAPA_ENCENDIDA){
+                solicitarDesactivarRele(reles[i]);
+                estadosEtapas[i] == ETAPA_APAGADA;
+            }
+        }
+        break;
+
+    case ALARMA: 
+        // Desactiva las primeras 3 etapas
+        for (int i=0;i<CANT_ETAPAS-2;i++){
+            solicitarDesactivarRele(reles[i]);
+            estadosEtapas[i] = ETAPA_APAGADA;
+        }
+        
+        // Activa la ultima etapa
+        solicitarActivarRele(reles[CANT_ETAPAS-1]);
+        estadosEtapas[CANT_ETAPAS-1] = ETAPA_ENCENDIDA;
+
+        break;
+
+    default: estadoControl = CONTROL_APAGADO;
     }
 }
 
@@ -164,31 +202,25 @@ void actualizarEtapa(int etapa){
                     }
                 }
             break;
-        default:  estadoControl = CONTROL_APAGADO;
+
     }
 }
 
-void verificarSensores(){
-    // if (*temperaturaBomba == -127 ){
-    //     cantidadLecturasErroneas[1]++;
-    //     if (cantidadLecturasErroneas[1] >= 10){
-    //         estadoControl = CONTROL_APAGADO;
-    //     }
-    // } else { 
-    //     cantidadLecturasErroneas[1] = 0;
-    // }
+bool verificarSensor(){
+    bool funcionamientoCorrecto = true;
+    static int cantidadLecturasErroneas = 0;
     
-    if (*temperaturaSeguridad > 500){
-        cantidadLecturasErroneas[0]++;
-        if (cantidadLecturasErroneas[0] >= 5){
-            estadoControl = CAMBIO_SENSORES;
-            solicitarDesactivarSensor();
-            cantidadLecturasErroneas[0] = 0;
+    // Si la temperaturar de seguridad esta por encima del limite de seguridad por mas de 5 lecturas consecutivas se pasa al estado CAMBIO_SENSORES
+    if (*temperaturaSeguridad > TEMP_SEGURIDAD){
+        cantidadLecturasErroneas++;
+        if (cantidadLecturasErroneas >= 5){
+            funcionamientoCorrecto = false;
+            cantidadLecturasErroneas = 0;
         }
     } else { 
-        cantidadLecturasErroneas[0] = 0;
+        cantidadLecturasErroneas = 0;
     }
-
+    return funcionamientoCorrecto;
 }
 
 void actualizarContador(){

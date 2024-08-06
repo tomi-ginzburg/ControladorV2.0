@@ -8,7 +8,7 @@
 typedef enum{
     LOOP,
     CONTROL,
-    SENSORES
+    IU
 } contador_t;
 
 // =====[Declaracion de funciones publicas]=====

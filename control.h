@@ -5,6 +5,7 @@
 #include "sensores.h"
 #include "reles.h"
 #include "configuraciones.h"
+#include "alarma.h"
 
 // =====[Declaracion de tipos de datos publicos]=====
 
@@ -12,7 +13,7 @@ typedef enum {
     CONTROL_APAGADO,
     FUNCIONANDO,
     CAMBIO_SENSORES,
-    DIAGNOSTICO
+    ALARMA
 } estadoControl_t;
 
 

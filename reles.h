@@ -14,6 +14,7 @@
 
 //=====[Declaration of public data types]======================================
 extern int reles[CANT_ETAPAS];
+
 //=====[Declarations (prototypes) of public functions]=========================
 
 void inicializarReles();

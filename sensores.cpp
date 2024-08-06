@@ -3,9 +3,8 @@
 // =====[Declaracion de defines privados]============
 
 #define SENSOR_CALDERA 13
-#define SENSOR_BOMBA 33
 #define SENSOR_SEGURIDAD 12
-#define CANTIDAD_SENSORES 3
+#define CANTIDAD_SENSORES 2
 
 // =====[Declaracion de tipos de datos privados]=====
 
@@ -13,12 +12,7 @@ bool flagActivarSensor = false;
 bool flagDesactivarSensor = false;
 
 // Cada sensor tiene CANTIDAD_MUESTRAS +1 porque la primera es el promedio de todo el resto
-// Para el DS18B20 no uso el promedio, uso directo la medicion por el tiempo de retardo que tiene
 float valorSensores[CANTIDAD_SENSORES][1+CANTIDAD_MUESTRAS];
-
-// OneWire ourWire(SENSOR_BOMBA);
-// DallasTemperature sensorDS(&ourWire);
-
 
 // =====[Declaracion de funciones privadas]==========
 
@@ -33,12 +27,6 @@ void inicializarSensores(){
             valorSensores[i][j] = 0;
         }
     }
-
-    // CONFIGURACIONES DS18B20
-    // sensorDS.begin();
-    // sensorDS.setResolution(12);
-    // sensorDS.setWaitForConversion(false);
-    // sensorDS.requestTemperatures();
 
     // TENSION DEL PUENTE DE WHEATSTONE PARA PT100
     dacWrite(26, 85);
@@ -60,8 +48,7 @@ void leerDatosSensores(){
 
     valorSensores[0][numeroMuestra] = analogRead(SENSOR_CALDERA);
     valorSensores[0][numeroMuestra] = (a*valorSensores[0][numeroMuestra] + b);
-
-    valorSensores[2][numeroMuestra] = analogRead(SENSOR_SEGURIDAD);
+    valorSensores[1][numeroMuestra] = analogRead(SENSOR_SEGURIDAD);
 
     if(numeroMuestra == CANTIDAD_MUESTRAS){
         numeroMuestra = 1;
@@ -72,11 +59,7 @@ void leerDatosSensores(){
 
 void actualizarSensores(){
     valorSensores[0][0] = obtenerPromedio(valorSensores[0]);
-
-    // valorSensores[1][0] = sensorDS.getTempCByIndex(0);
-    // sensorDS.requestTemperatures();
-
-    valorSensores[2][0] = obtenerPromedio(valorSensores[2]);
+    valorSensores[1][0] = obtenerPromedio(valorSensores[1]);
 }
 
 

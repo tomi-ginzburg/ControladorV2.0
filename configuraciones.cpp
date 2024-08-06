@@ -9,15 +9,26 @@
 
 // =====[Declaracion de tipos de datos privados]=====
 
+const int TIEMPO_CAMBIO_RAPIDO_MS = 50; //Tiene que ser multiplo de 10
+const int UMBRAL_CAMBIO_RAPIDO_MS = 1500;
+const int CANT_CAMBIOS_UMBRAL = 5;
 const float MINIMO_CAMBIO_SP = 0.1;
-const float MAX_SP = 100;
+const float MAXIMO_CAMBIO_SP = 1.0; 
+const float MAX_SP = 100.0;
 const float MIN_SP = 1.0;
+
 const float MINIMO_CAMBIO_HISTERESIS = 0.5;
-const float MAX_HISTERESIS = 10;
-const float MIN_HISTERESIS = 0;
-const float MINIMO_CAMBIO_RETARDO = 1;
-const float MAX_RETARDO = 15;
-const float MIN_RETARDO = 0;
+const float MAX_HISTERESIS = 10.0;
+const float MIN_HISTERESIS = 0.0;
+
+const float MINIMO_CAMBIO_RETARDO = 1.0;
+const float MAX_RETARDO = 15.0;
+const float MIN_RETARDO = 0.0;
+
+const float MAYOR_MAX_ALARMA = 100.0;
+const float MENOR_MAX_ALARMA = 60.0;
+const float MAYOR_MIN_ALARMA = 30.0;
+const float MENOR_MIN_ALARMA  = 0.0;
 
 Preferences nvs;
 configuracion_t configuracion;
@@ -35,11 +46,12 @@ bool botonesTerminados[CANTIDAD_BOTONES] = {true, true, true, true};
 // =====[Declaracion de funciones privadas]=====
 
 void inicializarValoresConfiguraciones();
-void actualizarControlFuncionando();
+void actualizarEstadoConfiguraciones();
 void actualizarMenuBasico();
 void actualizarMenuAvanzado();
 void actualizarMostrarParametros();
 void habilitarBotones(bool botonesTerminados[]);
+void cambioValorContinuo(float *parametro, float maximo, float minimo, float minimoCambio, float maximoCambio, bool activacion = false);
 
 // =====[Implementacion de funciones publicas]=====
 
@@ -60,13 +72,14 @@ void actualizarConfiguraciones(){
     
     switch (*estadoControlConfiguraciones){
         static bool primeraEntrada;
-        case DIAGNOSTICO:
         case CONTROL_APAGADO:
+        case ALARMA:
         case FUNCIONANDO:
             primeraEntrada = true;
-            actualizarControlFuncionando();
+            actualizarEstadoConfiguraciones();
             break;
         case CAMBIO_SENSORES:
+            // Si es la primera vez que se entra, se guarda el estado en memoria
             if (primeraEntrada == true){ 
                 configuracion.cambioSensores = true;
                 nvs.begin("Configs",false);
@@ -74,6 +87,8 @@ void actualizarConfiguraciones(){
                 nvs.end();
                 primeraEntrada = false;
             }
+
+            // Si se presiona ENTER, se vuelve guarda el nuevo modo de configuracino en memoria
             if (botonesConfiguracion[INDICE_ENTER].estado == PRESIONADO && botonesTerminados[INDICE_ENTER] == true){
               configuracion.cambioSensores = false;
               nvs.begin("Configs",false);
@@ -111,8 +126,10 @@ const configuracion_t* leerConfiguraciones(){
 void inicializarValoresConfiguraciones(){
     float valorConfiguracion;
     bool modoConfiguracion;
-    nvs.begin("Configs", true);
+    nvs.begin("Configs", false); // false para hacer el clear
+    //nvs.clear();
 
+    // VALORES DE LOS SP
     valorConfiguracion = nvs.getFloat("SP1",-1.0);
     if (valorConfiguracion != -1.0){
         configuracion.SP[0].valor = valorConfiguracion;    
@@ -127,7 +144,7 @@ void inicializarValoresConfiguraciones(){
         configuracion.SP[0].histeresis.valor = MIN_HISTERESIS;
     }
 
-     valorConfiguracion = nvs.getFloat("SP2",-1.0);
+    valorConfiguracion = nvs.getFloat("SP2",-1.0);
     if (valorConfiguracion != -1.0){
         configuracion.SP[1].valor = valorConfiguracion;    
     } else {
@@ -169,6 +186,7 @@ void inicializarValoresConfiguraciones(){
         configuracion.SP[3].histeresis.valor = MIN_HISTERESIS;
     }
     
+    // MAXIMO Y MINIMO SP
     valorConfiguracion = nvs.getFloat("SP-MAX",-1.0);
     if (valorConfiguracion != -1.0){
         configuracion.limitesSP.maximo = valorConfiguracion;    
@@ -183,6 +201,7 @@ void inicializarValoresConfiguraciones(){
         configuracion.limitesSP.minimo = MIN_SP;
     }    
     
+    // RETARDO PRENDIDO Y APAGADO
     valorConfiguracion = nvs.getFloat("RET_PREN",-1.0);
     if (valorConfiguracion != -1.0){
         configuracion.retardoPrendido.valor = valorConfiguracion;    
@@ -197,22 +216,46 @@ void inicializarValoresConfiguraciones(){
         configuracion.retardoApagado.valor = MIN_RETARDO;
     }
 
+    // ALARMA
+    valorConfiguracion = nvs.getFloat("MIN_ALARMA",-1.0);
+    if (valorConfiguracion != -1.0){
+        configuracion.alarma.minimo = valorConfiguracion;    
+    } else {
+        configuracion.alarma.minimo = MENOR_MIN_ALARMA;
+    }
+
+    valorConfiguracion = nvs.getFloat("MAX_ALARMA",-1.0);
+    if (valorConfiguracion != -1.0){
+        configuracion.alarma.maximo = valorConfiguracion;    
+    } else {
+        configuracion.alarma.maximo = MAYOR_MAX_ALARMA;
+    }
+    
+    modoConfiguracion = nvs.getBool("MIN_ALAR_ACT",-1.0);
+    if (valorConfiguracion != -1.0){
+        configuracion.alarma.minimoActivo = modoConfiguracion;    
+    } else {
+        configuracion.alarma.minimoActivo = false;
+    }
+    
+    modoConfiguracion = nvs.getBool("MAX_ALAR_ACT",-1.0);
+    if (valorConfiguracion != -1.0){
+        configuracion.alarma.maximoActivo = modoConfiguracion;    
+    } else {
+        configuracion.alarma.maximoActivo = false;
+    }
+
+    // MODOS
     modoConfiguracion = nvs.getBool("Sensores",-1.0);
     if (valorConfiguracion != -1.0){
         configuracion.cambioSensores = modoConfiguracion;    
     } else {
         configuracion.cambioSensores = false;
     }
-    
-    modoConfiguracion = nvs.getBool("Diagnostico",-1.0);
-    if (valorConfiguracion != -1.0){
-        configuracion.modoDiagnostico = modoConfiguracion;    
-    } else {
-        configuracion.modoDiagnostico = false;
-    }
 
     nvs.end();
 
+    // CODIGO MENU AVANZADO
     for (int i=0;i<CANT_DIGITOS_INGRESO;i++){
         configuracion.codigo.valor[i] = 0;
     }
@@ -228,7 +271,7 @@ void habilitarBotones(bool botonesTerminados[]){
     }
 }
 
-void actualizarControlFuncionando(){
+void actualizarEstadoConfiguraciones(){
     switch (estadoConfiguraciones){
     case IDLE_CONFIGURACION:
         // Si se aprieta el ENTER por mas de TIEMPO_AVANZADO_MS se entra al menu avanzado, y el basico vuelve a idle
@@ -244,7 +287,8 @@ void actualizarControlFuncionando(){
         else if (botonesConfiguracion[INDICE_ENTER].estado == PRESIONADO && botonesConfiguracion[INDICE_ENTER].tiempoPresionadoMs < TIEMPO_BASICO_MS && botonesTerminados[INDICE_ENTER] == true){
             estadoConfiguraciones = MOSTRAR_PARAMETROS;
         }
-    
+        break;
+
     case BASICO:
         // Si no se encuentra en cambio y se aprieta el Atras, se vuelve al modo IDLE
         actualizarMenuBasico();
@@ -261,6 +305,7 @@ void actualizarControlFuncionando(){
     case MOSTRAR_PARAMETROS:
         actualizarMostrarParametros();
         break;
+
     default: estadoConfiguraciones = IDLE_CONFIGURACION;
     }
 }
@@ -322,22 +367,11 @@ void actualizarMenuBasico(){
             else if (botonesConfiguracion[INDICE_ATRAS].estado == PRESIONADO){
                 estadoMenuBasico = SP1_ESTABLE;
                 botonesTerminados[INDICE_ATRAS] = false;
-                }
+            }
 
             // Si se aprieta Mas o Menos se cambia el valor de configuracionSP1
             else{
-                if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && configuracion.SP[0].valorConfiguracion < configuracion.limitesSP.maximo){
-                    if (configuracion.SP[0].valorConfiguracion == 0.0){
-                        configuracion.SP[0].valorConfiguracion = configuracion.limitesSP.minimo;
-                    }
-                    configuracion.SP[0].valorConfiguracion = configuracion.SP[0].valorConfiguracion + MINIMO_CAMBIO_SP;
-                }
-                if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && configuracion.SP[0].valorConfiguracion >= configuracion.limitesSP.minimo){ 
-                    configuracion.SP[0].valorConfiguracion = configuracion.SP[0].valorConfiguracion - MINIMO_CAMBIO_SP;
-                    if (configuracion.SP[0].valorConfiguracion < configuracion.limitesSP.minimo){ 
-                        configuracion.SP[0].valorConfiguracion = 0.0;
-                    }
-                }
+                cambioValorContinuo(&configuracion.SP[0].valorConfiguracion, configuracion.limitesSP.maximo, configuracion.limitesSP.minimo, MINIMO_CAMBIO_SP, MAXIMO_CAMBIO_SP, true);
             }
 
             break;
@@ -390,18 +424,7 @@ void actualizarMenuBasico(){
 
             // Si se aprieta Mas o Menos se cambia el valor de configuracionSP1
             else{
-                if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && configuracion.SP[1].valorConfiguracion < configuracion.limitesSP.maximo){
-                    if (configuracion.SP[1].valorConfiguracion == 0.0){
-                        configuracion.SP[1].valorConfiguracion = configuracion.limitesSP.minimo;
-                    }
-                    configuracion.SP[1].valorConfiguracion = configuracion.SP[1].valorConfiguracion + MINIMO_CAMBIO_SP;
-                }
-                if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && configuracion.SP[1].valorConfiguracion >= configuracion.limitesSP.minimo){
-                    configuracion.SP[1].valorConfiguracion = configuracion.SP[1].valorConfiguracion - MINIMO_CAMBIO_SP;
-                    if (configuracion.SP[1].valorConfiguracion < configuracion.limitesSP.minimo){ 
-                        configuracion.SP[1].valorConfiguracion = 0.0;
-                    }
-                }
+                cambioValorContinuo(&configuracion.SP[1].valorConfiguracion, configuracion.limitesSP.maximo, configuracion.limitesSP.minimo, MINIMO_CAMBIO_SP, MAXIMO_CAMBIO_SP, true);
             }
 
             break;
@@ -454,18 +477,7 @@ void actualizarMenuBasico(){
 
             // Si se aprieta Mas o Menos se cambia el valor de configuracionSP1
             else{
-                if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && configuracion.SP[2].valorConfiguracion < configuracion.limitesSP.maximo){
-                    if (configuracion.SP[2].valorConfiguracion == 0.0){
-                        configuracion.SP[2].valorConfiguracion = configuracion.limitesSP.minimo;
-                    }
-                    configuracion.SP[2].valorConfiguracion = configuracion.SP[2].valorConfiguracion + MINIMO_CAMBIO_SP;
-                }
-                if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && configuracion.SP[2].valorConfiguracion >= configuracion.limitesSP.minimo){
-                    configuracion.SP[2].valorConfiguracion = configuracion.SP[2].valorConfiguracion - MINIMO_CAMBIO_SP;
-                    if (configuracion.SP[2].valorConfiguracion < configuracion.limitesSP.minimo){ 
-                        configuracion.SP[2].valorConfiguracion = 0.0;
-                    }
-                }
+                cambioValorContinuo(&configuracion.SP[2].valorConfiguracion, configuracion.limitesSP.maximo, configuracion.limitesSP.minimo, MINIMO_CAMBIO_SP, MAXIMO_CAMBIO_SP, true);
             }
 
             break;
@@ -517,20 +529,9 @@ void actualizarMenuBasico(){
                 botonesTerminados[INDICE_ATRAS] = false;
                 }
 
-            // Si se aprieta Mas o Menos se cambia el valor de configuracionSP1
+            // Si se aprieta Mas o Menos se cambia el valor de SP3
             else{
-                if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && configuracion.SP[3].valorConfiguracion < configuracion.limitesSP.maximo){
-                    if (configuracion.SP[3].valorConfiguracion == 0.0){
-                        configuracion.SP[3].valorConfiguracion = configuracion.limitesSP.minimo;
-                    }
-                    configuracion.SP[3].valorConfiguracion = configuracion.SP[3].valorConfiguracion + MINIMO_CAMBIO_SP;
-                }
-                if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && configuracion.SP[3].valorConfiguracion >= configuracion.limitesSP.minimo){
-                    configuracion.SP[3].valorConfiguracion = configuracion.SP[3].valorConfiguracion - MINIMO_CAMBIO_SP;
-                    if (configuracion.SP[3].valorConfiguracion < configuracion.limitesSP.minimo){ 
-                        configuracion.SP[3].valorConfiguracion = 0.0;
-                    }
-                }
+                cambioValorContinuo(&configuracion.SP[3].valorConfiguracion, configuracion.limitesSP.maximo, configuracion.limitesSP.minimo, MINIMO_CAMBIO_SP, MAXIMO_CAMBIO_SP, true);
             }
 
             break;
@@ -552,6 +553,8 @@ void actualizarMenuAvanzado(){
                 }
                 configuracion.retardoPrendido.valorConfiguracion = configuracion.retardoPrendido.valor;
                 configuracion.retardoApagado.valorConfiguracion = configuracion.retardoApagado.valor;
+                configuracion.alarma.minimoConfiguracion = configuracion.alarma.minimo;
+                configuracion.alarma.maximoConfiguracion = configuracion.alarma.maximo;
                 botonesTerminados[INDICE_ENTER] = false;
             }
             break;
@@ -876,12 +879,7 @@ void actualizarMenuAvanzado(){
 
             // Si se aprieta Mas o Menos se cambia el valor de configuracionconfiguracion.SP1.maximo
             else{
-                if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && configuracion.limitesSP.maximoConfiguracion < MAX_SP){
-                    configuracion.limitesSP.maximoConfiguracion = configuracion.limitesSP.maximoConfiguracion + MINIMO_CAMBIO_SP;
-                }
-                if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && configuracion.limitesSP.maximoConfiguracion > MIN_SP){
-                    configuracion.limitesSP.maximoConfiguracion = configuracion.limitesSP.maximoConfiguracion - MINIMO_CAMBIO_SP;
-                }
+                cambioValorContinuo(&configuracion.limitesSP.maximoConfiguracion, MAX_SP, configuracion.limitesSP.minimo, MINIMO_CAMBIO_SP, MAXIMO_CAMBIO_SP, false);
             }
 
             break;
@@ -905,12 +903,7 @@ void actualizarMenuAvanzado(){
 
             // Si se aprieta Mas o Menos se cambia el valor de configuracionconfiguracion.limitesSP.minimo
             else{
-                if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && configuracion.limitesSP.minimoConfiguracion < MAX_SP){
-                    configuracion.limitesSP.minimoConfiguracion = configuracion.limitesSP.minimoConfiguracion + MINIMO_CAMBIO_SP;
-                }
-                if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && configuracion.limitesSP.minimoConfiguracion > MIN_SP){
-                    configuracion.limitesSP.minimoConfiguracion = configuracion.limitesSP.minimoConfiguracion - MINIMO_CAMBIO_SP;
-                }
+                cambioValorContinuo(&configuracion.limitesSP.minimoConfiguracion, configuracion.limitesSP.maximo, MIN_SP, MINIMO_CAMBIO_SP, MAXIMO_CAMBIO_SP, false);
             }
 
             break;
@@ -936,9 +929,9 @@ void actualizarMenuAvanzado(){
             }
 
 
-            // Si se aprieta mas con el boton que ya haya terminado, se pasa al modo CONFIG_SENSORES
+            // Si se aprieta mas con el boton que ya haya terminado, se pasa al modo MINIMO_ALARMA_ESPERANDO
             else if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && botonesTerminados[INDICE_MAS] == true){
-                estadoMenuAvanzado = VERSION_SOFTWARE;
+                estadoMenuAvanzado = MINIMO_ALARMA_ESPERANDO;
                 botonesTerminados[INDICE_MAS] = false;
             }
 
@@ -1003,20 +996,14 @@ void actualizarMenuAvanzado(){
             }
 
             break;
-        case CONFIG_SENSORES:
-            // Si se aprieta Enter se habilita o deshabilita el cambioSensores
+        
+        case MINIMO_ALARMA_ESPERANDO:
+             // Si se aprieta Enter se pasa al estado MINIMO_ALARMA_EN_CAMBIO
             if (botonesConfiguracion[INDICE_ENTER].estado == PRESIONADO && botonesTerminados[INDICE_ENTER] == true){
-                if (configuracion.cambioSensores == false){
-                    configuracion.cambioSensores = true;
-                } else {
-                    configuracion.cambioSensores = false;
-                }
-                nvs.begin("Configs",false);
-                nvs.putBool("Sensores", configuracion.cambioSensores);
-                nvs.end();
+                estadoMenuAvanzado = MINIMO_ALARMA_EN_CAMBIO;
                 botonesTerminados[INDICE_ENTER] = false;
             } 
-
+            
             // Si se aprieta Atras se vuelve al modo IDLE de estadoMenuAvanzado y de estadoConfiguraciones
             else if (botonesConfiguracion[INDICE_ATRAS].estado == PRESIONADO && botonesTerminados[INDICE_ATRAS] == true){
                 estadoMenuAvanzado = IDLE_AVANZADO;
@@ -1024,34 +1011,90 @@ void actualizarMenuAvanzado(){
                 botonesTerminados[INDICE_ATRAS] = false;
             }
 
-            // Si se aprieta menos se pasa al modo RETARDOS_ESPERANDO
+            // Si se aprieta menos con el boton que ya haya terminado, se pasa al modo RETARDOS_ESPERANDO
             else if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && botonesTerminados[INDICE_MENOS] == true){
                 estadoMenuAvanzado = RETARDOS_ESPERANDO;
                 botonesTerminados[INDICE_MENOS] = false;
             }
 
 
-             // Si se aprieta mas se pasa al modo MODO_DIAGNOSTICO
+            // Si se aprieta mas con el boton que ya haya terminado, se pasa al modo CONFIG_SENSORES
             else if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && botonesTerminados[INDICE_MAS] == true){
-                estadoMenuAvanzado = MODO_DIAGNOSTICO;
+                estadoMenuAvanzado = MAXIMO_ALARMA_ESPERANDO;
                 botonesTerminados[INDICE_MAS] = false;
             }
-            
             break;
-        case MODO_DIAGNOSTICO:
-            // Si se aprieta Enter se cambia el modoDiagnostico
+        case MINIMO_ALARMA_EN_CAMBIO:
+            // Si se aprieta Enter se guarda el valor minimo y pasa al estado MINIMO_ALARMA_ACTIVO_EN_CAMBIO
             if (botonesConfiguracion[INDICE_ENTER].estado == PRESIONADO && botonesTerminados[INDICE_ENTER] == true){
-                if (configuracion.modoDiagnostico == false ){
-                    configuracion.modoDiagnostico = true;
-                } else {
-                    configuracion.modoDiagnostico = false;
-                }
                 nvs.begin("Configs",false);
-                nvs.putBool("Diagnostico", configuracion.cambioSensores);
+                nvs.putFloat("MIN_ALARMA",configuracion.alarma.minimoConfiguracion);
                 nvs.end();
+                configuracion.alarma.minimo = configuracion.alarma.minimoConfiguracion;
+                estadoMenuAvanzado = MINIMO_ALARMA_ACTIVO_EN_CAMBIO;
                 botonesTerminados[INDICE_ENTER] = false;
             } 
 
+            // Si se aprieta Atras se vuelve a MINIMO_ALARMA_ESPERANDO
+            else if (botonesConfiguracion[INDICE_ATRAS].estado == PRESIONADO && botonesTerminados[INDICE_ENTER] == true){
+                estadoMenuAvanzado = MINIMO_ALARMA_ESPERANDO;
+                botonesTerminados[INDICE_ATRAS] = false;
+                }
+
+            // Si se aprieta Mas o Menos se cambia el valor de configuracionconfiguracion.alarma.minimoConfiguracion
+            else{
+                cambioValorContinuo(&configuracion.alarma.minimoConfiguracion, MAYOR_MIN_ALARMA, MENOR_MIN_ALARMA, MINIMO_CAMBIO_SP, MAXIMO_CAMBIO_SP, false);
+            }
+
+            break;
+        case MINIMO_ALARMA_ACTIVO_EN_CAMBIO:
+
+            // Si se aprieta ENTER se guarda la configuracion y se vuelve a MINIMO_ALARMA_ESPERANDO
+            if (botonesConfiguracion[INDICE_ENTER].estado == PRESIONADO && botonesTerminados[INDICE_ENTER] == true){
+                nvs.begin("Configs",false);
+                nvs.putBool("MIN_ALAR_ACT", configuracion.alarma.minimoActivo);
+                nvs.end();
+                botonesTerminados[INDICE_ENTER] = false;
+                estadoMenuAvanzado = MINIMO_ALARMA_ESPERANDO;
+
+            }
+
+            // Si se aprieta Atras se vuelve al modo MINIMO_ALARMA_EN_CAMBIO
+            else if (botonesConfiguracion[INDICE_ATRAS].estado == PRESIONADO && botonesTerminados[INDICE_ATRAS] == true){
+                estadoMenuAvanzado = MINIMO_ALARMA_EN_CAMBIO;
+                botonesTerminados[INDICE_ATRAS] = false;
+            }
+
+            // Si se aprieta MAS se habilita o deshabilita el MINIMO_ALARMA
+            else if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && botonesTerminados[INDICE_MAS] == true){
+                if (configuracion.alarma.minimoActivo == false){
+                    configuracion.alarma.minimoActivo = true;
+                } else {
+                    configuracion.alarma.minimoActivo = false;
+                }
+
+                botonesTerminados[INDICE_MAS] = false;
+            } 
+
+            // Si se aprieta MENOS se habilita o deshabilita el MINIMO_ALARMA
+            else if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && botonesTerminados[INDICE_MENOS] == true){
+                if (configuracion.alarma.minimoActivo == false){
+                    configuracion.alarma.minimoActivo = true;
+                } else {
+                    configuracion.alarma.minimoActivo = false;
+                }
+
+                botonesTerminados[INDICE_MENOS] = false;
+            } 
+            
+            break;
+        case MAXIMO_ALARMA_ESPERANDO:
+             // Si se aprieta Enter se pasa al estado MAXIMO_ALARMA_EN_CAMBIO
+            if (botonesConfiguracion[INDICE_ENTER].estado == PRESIONADO && botonesTerminados[INDICE_ENTER] == true){
+                estadoMenuAvanzado = MAXIMO_ALARMA_EN_CAMBIO;
+                botonesTerminados[INDICE_ENTER] = false;
+            } 
+            
             // Si se aprieta Atras se vuelve al modo IDLE de estadoMenuAvanzado y de estadoConfiguraciones
             else if (botonesConfiguracion[INDICE_ATRAS].estado == PRESIONADO && botonesTerminados[INDICE_ATRAS] == true){
                 estadoMenuAvanzado = IDLE_AVANZADO;
@@ -1059,18 +1102,83 @@ void actualizarMenuAvanzado(){
                 botonesTerminados[INDICE_ATRAS] = false;
             }
 
-            // Si se aprieta menos se pasa al modo CONFIG_SENSORES
+            // Si se aprieta menos con el boton que ya haya terminado, se pasa al modo MINIMO_ALARMA_ESPERANDO
             else if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && botonesTerminados[INDICE_MENOS] == true){
-                estadoMenuAvanzado = CONFIG_SENSORES;
+                estadoMenuAvanzado = MINIMO_ALARMA_ESPERANDO;
                 botonesTerminados[INDICE_MENOS] = false;
             }
-            
-            // Si se aprieta mas se pasa al modo VERSION_SOFTWARE
+
+
+            // Si se aprieta mas con el boton que ya haya terminado, se pasa al modo CONFIG_SENSORES
             else if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && botonesTerminados[INDICE_MAS] == true){
                 estadoMenuAvanzado = VERSION_SOFTWARE;
                 botonesTerminados[INDICE_MAS] = false;
             }
             break;
+        case MAXIMO_ALARMA_EN_CAMBIO:
+            // Si se aprieta Enter se guarda el valor minimo y pasa al estado MAXIMO_ALARMA_ACTIVO_EN_CAMBIO
+            if (botonesConfiguracion[INDICE_ENTER].estado == PRESIONADO && botonesTerminados[INDICE_ENTER] == true){
+                nvs.begin("Configs",false);
+                nvs.putFloat("MAX_ALARMA",configuracion.alarma.maximoConfiguracion);
+                nvs.end();
+                configuracion.alarma.maximo = configuracion.alarma.maximoConfiguracion;
+                estadoMenuAvanzado = MAXIMO_ALARMA_ACTIVO_EN_CAMBIO;
+                botonesTerminados[INDICE_ENTER] = false;
+            } 
+
+            // Si se aprieta Atras se vuelve a MAXIMO_ALARMA_ESPERANDO
+            else if (botonesConfiguracion[INDICE_ATRAS].estado == PRESIONADO && botonesTerminados[INDICE_ENTER] == true){
+                estadoMenuAvanzado = MAXIMO_ALARMA_ESPERANDO;
+                botonesTerminados[INDICE_ATRAS] = false;
+                }
+
+            // Si se aprieta Mas o Menos se cambia el valor de configuracionconfiguracion.alarma.maximoConfiguracion
+            else{
+                cambioValorContinuo(&configuracion.alarma.maximoConfiguracion, MAYOR_MAX_ALARMA, MENOR_MAX_ALARMA, MINIMO_CAMBIO_SP, MAXIMO_CAMBIO_SP, false);
+            }
+
+            break;
+        case MAXIMO_ALARMA_ACTIVO_EN_CAMBIO:
+            // Si se aprieta ENTER se guarda la configuracion y se vuelve a MAXIMO_ALARMA_ESPERANDO
+            if (botonesConfiguracion[INDICE_ENTER].estado == PRESIONADO && botonesTerminados[INDICE_ENTER] == true){
+                nvs.begin("Configs",false);
+                nvs.putBool("MAX_ALAR_ACT", configuracion.alarma.maximoActivo);
+                nvs.end();
+                botonesTerminados[INDICE_ENTER] = false;
+                estadoMenuAvanzado = MAXIMO_ALARMA_ESPERANDO;
+
+            }
+
+            // Si se aprieta Atras se vuelve al modo MAXIMO_ALARMA_EN_CAMBIO
+            else if (botonesConfiguracion[INDICE_ATRAS].estado == PRESIONADO && botonesTerminados[INDICE_ATRAS] == true){
+                estadoMenuAvanzado = MAXIMO_ALARMA_EN_CAMBIO;
+                botonesTerminados[INDICE_ATRAS] = false;
+            }
+
+            // Si se aprieta MAS se habilita o deshabilita el MAXIMO_ALARMA
+            else if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && botonesTerminados[INDICE_MAS] == true){
+                if (configuracion.alarma.maximoActivo == false){
+                    configuracion.alarma.maximoActivo = true;
+                } else {
+                    configuracion.alarma.maximoActivo = false;
+                }
+
+                botonesTerminados[INDICE_MAS] = false;
+            } 
+
+            // Si se aprieta MENOS se habilita o deshabilita el MAXIMO_ALARMA
+            else if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && botonesTerminados[INDICE_MENOS] == true){
+                if (configuracion.alarma.maximoActivo == false){
+                    configuracion.alarma.maximoActivo = true;
+                } else {
+                    configuracion.alarma.maximoActivo = false;
+                }
+
+                botonesTerminados[INDICE_MENOS] = false;
+            } 
+            
+            break;
+
         case VERSION_SOFTWARE:
             // Si se aprieta Atras se vuelve al modo IDLE de estadoMenuAvanzado y de estadoConfiguraciones
             if (botonesConfiguracion[INDICE_ATRAS].estado == PRESIONADO && botonesTerminados[INDICE_ATRAS] == true){
@@ -1079,9 +1187,9 @@ void actualizarMenuAvanzado(){
                 botonesTerminados[INDICE_ATRAS] = false;
             }
 
-            // Si se aprieta menos se pasa al modo MODO_DIAGNOSTICO
+            // Si se aprieta menos se pasa al modo MAXIMO_ALARMA_ESPERANDO
             else if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && botonesTerminados[INDICE_MENOS] == true){
-                estadoMenuAvanzado = RETARDOS_ESPERANDO;
+                estadoMenuAvanzado = MAXIMO_ALARMA_ESPERANDO;
                 botonesTerminados[INDICE_MENOS] = false;
             }
             
@@ -1106,4 +1214,61 @@ void actualizarMostrarParametros(){
         contador = -2;
     }
     contador++;
+}
+
+void cambioValorContinuo(float *parametro, float maximo, float minimo, float minimoCambio, float maximoCambio, bool activacion){
+    
+    // Si se aprieta el boton MAS y es menor que el maximo se aumenta el valor
+    if (botonesConfiguracion[INDICE_MAS].estado == PRESIONADO && *parametro < maximo){
+        // Si esta la activacion sirve para llevar el valor a 0 y poder desactivar el *parametro
+        // LLeva de 0.0 al minimo
+        if (*parametro == 0.0 && activacion == true){
+            *parametro = minimo;
+        } else{
+            if (botonesConfiguracion[INDICE_MAS].tiempoPresionadoMs < UMBRAL_CAMBIO_RAPIDO_MS){
+                if (botonesConfiguracion[INDICE_MAS].tiempoPresionadoMs % (UMBRAL_CAMBIO_RAPIDO_MS/CANT_CAMBIOS_UMBRAL) == 0){
+                    *parametro = *parametro + MINIMO_CAMBIO_SP;
+                }
+            } else if (botonesConfiguracion[INDICE_MAS].tiempoPresionadoMs < 2 * UMBRAL_CAMBIO_RAPIDO_MS) {
+                if (botonesConfiguracion[INDICE_MAS].tiempoPresionadoMs % (5 * TIEMPO_CAMBIO_RAPIDO_MS) == 0){
+                    *parametro = *parametro + MAXIMO_CAMBIO_SP;
+                }
+            } else {
+                if (botonesConfiguracion[INDICE_MAS].tiempoPresionadoMs % TIEMPO_CAMBIO_RAPIDO_MS == 0){
+                    *parametro = *parametro + MAXIMO_CAMBIO_SP;
+                }
+            }
+
+            // Por redondeo puede ser que se pase del maximo, entonces se asegura de que no supere
+            if (*parametro > maximo){
+                *parametro = maximo;
+            }
+        }
+    }
+
+    // Si se aprieta el MENOS y es mayor que el minimo
+    if (botonesConfiguracion[INDICE_MENOS].estado == PRESIONADO && *parametro >= minimo){ 
+        if (botonesConfiguracion[INDICE_MENOS].tiempoPresionadoMs < UMBRAL_CAMBIO_RAPIDO_MS){
+            if (botonesConfiguracion[INDICE_MENOS].tiempoPresionadoMs % (UMBRAL_CAMBIO_RAPIDO_MS/CANT_CAMBIOS_UMBRAL) == 0){
+                *parametro = *parametro - MINIMO_CAMBIO_SP;
+            }
+        } else if (botonesConfiguracion[INDICE_MENOS].tiempoPresionadoMs < 2 * UMBRAL_CAMBIO_RAPIDO_MS) {
+            if (botonesConfiguracion[INDICE_MENOS].tiempoPresionadoMs % (5 * TIEMPO_CAMBIO_RAPIDO_MS) == 0){
+                *parametro = *parametro - MAXIMO_CAMBIO_SP;
+            }
+        } else {
+            if (botonesConfiguracion[INDICE_MENOS].tiempoPresionadoMs % TIEMPO_CAMBIO_RAPIDO_MS == 0){
+                *parametro = *parametro - MAXIMO_CAMBIO_SP;
+            }
+        }
+        
+        // Si se baja por mas del minimo se asegura que vaya justo al minimo o a 0.0 si esta la activacion
+        if (*parametro < minimo){ 
+            if (activacion == true){
+                *parametro = 0.0;
+            } else {
+                *parametro = minimo;
+            }
+        }
+    }
 }

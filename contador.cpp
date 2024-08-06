@@ -9,7 +9,7 @@ hw_timer_t * timerContador = NULL;
 volatile  uint64_t valorContador = 0;
 uint64_t ultimoValorLoop = 0;
 uint64_t ultimoValorControl = 0;
-uint64_t ultimoValorSensor = 0;
+uint64_t ultimoValorIu = 0;
 
 // =====[Declaracion de funciones privadas]=====
 
@@ -40,9 +40,9 @@ bool contadorIgualA(uint64_t intervalo, contador_t tipoContador){
             esIgual = true;
             }
             break;
-        case SENSORES:
-            if (valorContador - ultimoValorSensor >= intervalo){
-            ultimoValorSensor = valorContador;
+        case IU:
+            if (valorContador - ultimoValorIu >= intervalo){
+            ultimoValorIu = valorContador;
             esIgual = true;
             }
             break;
