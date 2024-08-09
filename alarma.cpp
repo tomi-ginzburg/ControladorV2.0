@@ -48,7 +48,7 @@ void actualizarAlarma(){
             // Actualiza el estado de la alarma
             if (flagDesactivarAlarma == true){
                 estadoAlarma = APAGADA;
-                ledcWriteTone(ALARMA,0);
+                ledcWriteTone(CANAL_ALARMA,0);
                 flagDesactivarAlarma = false;
             }
 

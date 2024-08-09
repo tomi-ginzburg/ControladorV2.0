@@ -62,7 +62,7 @@ const estadoControl_t* leerEstadoControl(){
 // =====[Implementacion de funciones privadas]=======
 
 void actualizarEstadoControl(){
-
+    
     switch (estadoControl){
         case CONTROL_APAGADO: break;
 
@@ -100,6 +100,7 @@ void actualizarEstadoControl(){
                 estadoControl = FUNCIONANDO;
                 solicitarDesactivarAlarma();
             }
+            break;
 
         default: estadoControl = CONTROL_APAGADO;
     }
