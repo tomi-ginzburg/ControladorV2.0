@@ -76,8 +76,10 @@ void actualizarEstadoControl(){
             // Se verifica la alarma
             if ((configuracionesControl->alarma.maximoActivo == true && *temperaturaCalentador > configuracionesControl->alarma.maximo)
                 || (configuracionesControl->alarma.minimoActivo == true && *temperaturaCalentador < configuracionesControl->alarma.minimo)){
-                estadoControl = ALARMA;
-                solicitarActivarAlarma();
+                if (*temperaturaSeguridad < TEMP_SEGURIDAD){
+                    estadoControl = ALARMA;
+                    solicitarActivarAlarma();
+                }
             }
             break;
 
@@ -98,12 +100,6 @@ void actualizarEstadoControl(){
                 estadoControl = FUNCIONANDO;
                 solicitarDesactivarAlarma();
             }
-            
-            if (verificarSensor() == false){
-                estadoControl = CAMBIO_SENSORES;
-                solicitarDesactivarSensor();
-            }
-            break;
 
         default: estadoControl = CONTROL_APAGADO;
     }
@@ -125,6 +121,7 @@ void actualizarEtapas(){
             if (configuracionesControl->SP[i].valor > 0){
                 actualizarEtapa(i);
             } else if (estadosEtapas[i] == ETAPA_ENCENDIDA){
+                // Chequeo que no haya alguna desactivada que quedo prendida
                 solicitarDesactivarRele(reles[i]);
                 estadosEtapas[i] == ETAPA_APAGADA;
             }

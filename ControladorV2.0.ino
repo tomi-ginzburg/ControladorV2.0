@@ -6,10 +6,10 @@
 #include "alarma.h"
 
 
-#define TIEMPO_CONTADOR_MS 1
-#define DELAY_CONTROL_MS 1000
-#define DELAY_IU_MS 50
-#define DELAY_LOOP_MS 10 // Tiene que tener sentido con DELAY_CONTROL_MS y CANTIDAD_MUESTRAS en el modulo de sensores
+#define TIEMPO_CONTADOR_MS  1
+#define DELAY_CONTROL_MS    1000
+#define DELAY_IU_MS         50
+#define DELAY_LOOP_MS       10 // Tiene que tener sentido con DELAY_CONTROL_MS y CANTIDAD_MUESTRAS en el modulo de sensores
 
 
 void setup() {
