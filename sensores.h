@@ -4,6 +4,7 @@
 #include "Arduino.h"
 #include <OneWire.h>                
 #include <DallasTemperature.h>
+#include "esp_adc_cal.h"
 
 #define CANTIDAD_MUESTRAS 100
 
