@@ -1,6 +1,8 @@
 #include "interfaz_usuario.h"
 
 
+#define TIEMPO_TITILAR  10
+
 // =====[Declaracion de tipos de datos privados]=====
 
 LiquidCrystal_I2C lcd(0x27,16,2);
@@ -66,7 +68,16 @@ void actualizarInterfazUsuario(){
     actualizarPrimeraEntradaEstado();
     
     // Si esta en estado CAMBIO SENSORES, se muestra por pantalla VERIFICAR SENSOR
-    if (*estadoControlIU == CAMBIO_SENSORES){
+    
+    if (*estadoControlIU == ALARMA){
+        if (primeraEntradaEstado == true){
+            lcd.clear();
+            lcd.setCursor(5,0);
+            lcd.print("APAGAR");
+            lcd.setCursor(5,1);
+            lcd.print("EQUIPO");
+        }
+    } else if (*estadoControlIU == CAMBIO_SENSORES){
         if (primeraEntradaEstado == true){
             lcd.clear();
             lcd.setCursor(3,0);
@@ -211,11 +222,11 @@ void actualizarDisplayAvanzado(){
                 lcd.print("*");
             }
             static int contador = 0;
-            if (contador > 50){
+            if (contador > TIEMPO_TITILAR){
                 lcd.setCursor(6+configuraciones->codigo.cantidadDigitosIngresados,1);
                 lcd.print("_");
             }
-            if (contador > 100 ){
+            if (contador > 2* TIEMPO_TITILAR ){
                 lcd.setCursor(6+configuraciones->codigo.cantidadDigitosIngresados,1);
                  lcd.print(configuraciones->codigo.digitoActual,0);
                 contador = 0;
@@ -578,11 +589,11 @@ void actualizarPrimeraEntradaEstado(){
 
 void titilarCursor(int x,int y){
     static int contador = 0;
-    if (contador == 10){
+    if (contador == TIEMPO_TITILAR){
         lcd.setCursor(x,y);
         lcd.print("->");
     }
-    if (contador == 20 ){
+    if (contador == 2* TIEMPO_TITILAR ){
         lcd.setCursor(x,y);
         lcd.print("  ");
         contador = 0;
