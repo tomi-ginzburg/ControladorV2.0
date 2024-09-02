@@ -96,6 +96,7 @@ void cambiarEstadoFinTiempo(boton_t *boton){
         boton->estado = NO_PRESIONADO;
     } else {
         boton->estado = PRESIONADO;
+        solicitarActivarBocina();
     }
     boton->tiempoCambioMs = 0;
 }

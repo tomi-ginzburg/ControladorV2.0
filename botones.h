@@ -2,6 +2,7 @@
 #define _BOTONES_H_
 
 #include "Arduino.h"
+#include "buzzer.h"
 
 // =====[Declaracion de defines publicos]============
 
