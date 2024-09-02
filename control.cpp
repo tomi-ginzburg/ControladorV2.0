@@ -76,7 +76,7 @@ void actualizarEstadoControl(){
             // Se verifica la alarma
             if ((configuracionesControl->alarma.maximoActivo == true && *temperaturaCalentador > configuracionesControl->alarma.maximo)
                 || (configuracionesControl->alarma.minimoActivo == true && *temperaturaCalentador < configuracionesControl->alarma.minimo)){
-                if (*temperaturaSeguridad < TEMP_SEGURIDAD){
+                if (*temperaturaSeguridad < TEMP_SEGURIDAD){ // Si no fallaron los sensores
                     estadoControl = ALARMA;
                     solicitarActivarAlarma();
                 }
@@ -93,10 +93,8 @@ void actualizarEstadoControl(){
 
         case ALARMA:
             // Se vuelve al modo FUNCIONANDO en caso de que la temperatura vuelva a los limites o se apague la alarma en las configuraciones
-            if ((configuracionesControl->alarma.maximoActivo == true && *temperaturaCalentador < configuracionesControl->alarma.maximo)
-                || (configuracionesControl->alarma.minimoActivo == true && *temperaturaCalentador > configuracionesControl->alarma.minimo)
-                || (configuracionesControl->alarma.minimoActivo == false && *temperaturaCalentador <= configuracionesControl->alarma.minimo)
-                || (configuracionesControl->alarma.maximoActivo == false && *temperaturaCalentador >= configuracionesControl->alarma.maximo)){
+            if (!((configuracionesControl->alarma.maximoActivo == true && *temperaturaCalentador >= configuracionesControl->alarma.maximo)
+                || (configuracionesControl->alarma.minimoActivo == true && *temperaturaCalentador <= configuracionesControl->alarma.minimo))){
                 estadoControl = FUNCIONANDO;
                 solicitarDesactivarAlarma();
             }

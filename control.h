@@ -5,7 +5,7 @@
 #include "sensores.h"
 #include "reles.h"
 #include "configuraciones.h"
-#include "alarma.h"
+#include "buzzer.h"
 
 // =====[Declaracion de tipos de datos publicos]=====
 
