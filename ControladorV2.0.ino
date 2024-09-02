@@ -1,9 +1,9 @@
 #include "contador.h"
 #include "control.h"
+#include "buzzer.h"
 #include "botones.h"
 #include "configuraciones.h"
 #include "interfaz_usuario.h"
-#include "alarma.h"
 
 
 #define TIEMPO_CONTADOR_MS  1
@@ -13,10 +13,10 @@
 
 
 void setup() {
-  // Serial.begin(115200);
+  Serial.begin(115200);
   inicializarSensores();
   inicializarReles();
-  inicializarAlarma();
+  inicializarBuzzer();
   inicializarBotones();
   inicializarConfiguraciones();
   inicializarControles();
@@ -31,11 +31,11 @@ void loop() {
     actualizarSensores();
     actualizarControles();
     actualizarReles();
-    actualizarAlarma();
   }
   if (contadorIgualA(DELAY_LOOP_MS, LOOP)){
     leerDatosSensores();
     actualizarBotones();
+    actualizarBuzzer();
     actualizarConfiguraciones();
   }
   if (contadorIgualA(DELAY_IU_MS, IU)){
