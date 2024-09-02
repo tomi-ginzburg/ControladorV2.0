@@ -26,8 +26,8 @@ const float MAX_RETARDO = 15.0;
 const float MIN_RETARDO = 0.0;
 
 const float MAYOR_MAX_ALARMA = 100.0;
-const float MENOR_MAX_ALARMA = 60.0;
-const float MAYOR_MIN_ALARMA = 30.0;
+const float MENOR_MAX_ALARMA = 80.0;
+const float MAYOR_MIN_ALARMA = 10.0;
 const float MENOR_MIN_ALARMA  = 0.0;
 
 Preferences nvs;
